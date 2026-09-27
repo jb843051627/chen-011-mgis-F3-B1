@@ -286,14 +286,16 @@ class CatalogBookJudgeTest {
     }
 
     @Test
-    void 未填行次按序补且避开填报占用号() {
+    void 未填行次按原表次序顺次补号() {
+        // 填报占了 3，后头未填的顺次后补 4、5——行次序列与原表先后一致，
+        // 回执上的行次才指得回原表那一行（不许倒填 1、2 错位）
         CatalogVerdict v = CatalogBookJudge.judge(book("ML-GAP", "临川市",
                 line(3, "A3", "地形图", "临川", "3"),
-                line(null, "A1", "地形图", "临川", "1"),
-                line(null, "A2", "地形图", "临川", "2")));
+                line(null, "A4", "地形图", "临川", "4"),
+                line(null, "A5", "地形图", "临川", "5")));
         assertEquals(3, at(v, 3).getRowNo());
-        assertEquals(1, at(v, 1).getRowNo());
-        assertEquals(2, at(v, 2).getRowNo());
+        assertEquals(4, at(v, 4).getRowNo());
+        assertEquals(5, at(v, 5).getRowNo());
     }
 
     // ---------- 翻账三数同出一处 ----------

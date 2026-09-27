@@ -233,32 +233,40 @@ public final class CatalogBookJudge {
     }
 
     /**
-     * 行次归置：填报所指的先用，未填的按原表次序补空号（自一连排）。
-     * 填报行次册内撞号、或不是正整数——行次对不上原表，挂账缘故就没法
-     * 指到具体哪一行，整册不收。
+     * 行次归置：填报所指的先用，未填的按原表次序顺次补号（自一连排）。
+     * 补出来的行次序列须与原表先后一致——回执上的行次才指得回原表那一行；
+     * 填报行次册内撞号、不是正整数、或与原表先后相悖（前头无处可补），
+     * 都是行次对不上原表，挂账缘故就没法指到具体哪一行，整册不收。
      */
     private static int[] assignRowNos(List<CatalogAcceptRequest.Line> raw) {
         int n = raw.size();
         int[] rowNos = new int[n];
-        Set<Integer> taken = new HashSet<Integer>();
+        Set<Integer> claimed = new HashSet<Integer>();
         for (int i = 0; i < n; i++) {
-            Integer claimed = raw.get(i).getRowNo();
-            if (claimed != null) {
-                if (claimed <= 0 || !taken.add(claimed)) {
-                    throw new CatalogAcceptException("行次对不上原表：第 " + (i + 1) + " 行填报行次 "
-                            + claimed + " 册内撞号或不正，整册不收");
-                }
-                rowNos[i] = claimed;
+            Integer c = raw.get(i).getRowNo();
+            if (c != null && (c <= 0 || !claimed.add(c))) {
+                throw new CatalogAcceptException("行次对不上原表：第 " + (i + 1) + " 行填报行次 "
+                        + c + " 册内撞号或不正，整册不收");
             }
         }
-        int next = 1;
+        int prev = 0;
         for (int i = 0; i < n; i++) {
-            if (raw.get(i).getRowNo() == null) {
-                while (taken.contains(next)) {
-                    next++;
+            Integer c = raw.get(i).getRowNo();
+            if (c != null) {
+                if (c <= prev) {
+                    throw new CatalogAcceptException("行次对不上原表：第 " + (i + 1) + " 行填报行次 "
+                            + c + " 与原表先后相悖，整册不收");
                 }
-                rowNos[i] = next;
-                taken.add(next);
+                rowNos[i] = c;
+                prev = c;
+            } else {
+                int fill = prev + 1;
+                if (claimed.contains(fill)) {
+                    throw new CatalogAcceptException("行次对不上原表：第 " + (i + 1)
+                            + " 行按原表次序无空号可补（" + fill + " 已被填报占用），整册不收");
+                }
+                rowNos[i] = fill;
+                prev = fill;
             }
         }
         return rowNos;

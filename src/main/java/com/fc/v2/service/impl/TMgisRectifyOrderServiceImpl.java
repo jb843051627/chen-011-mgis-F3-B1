@@ -90,6 +90,15 @@ public class TMgisRectifyOrderServiceImpl implements ITMgisRectifyOrderService {
         // 同一点第二回来的，只认头一笔落笔的时辰——哪怕单子已挪到下一站，
         // 这一笔也不重落，把头一笔原样回给它
         TMgisRectifyEntry dup = findAt(chain, action, order.getRoundNo());
+        if (dup == null && RectifyFlow.isSendBack(action)) {
+            // 退回重办落笔即挪站加轮：同一请求超时重投时单子已在新一轮，
+            // 认链尾那一笔——正是它把单子带进眼下这一轮
+            TMgisRectifyEntry last = chain.isEmpty() ? null : chain.get(chain.size() - 1);
+            if (last != null && RectifyAction.SEND_BACK.name().equals(last.getAction())
+                    && last.getRoundNo() != null && last.getRoundNo() == order.getRoundNo() - 1) {
+                dup = last;
+            }
+        }
         if (dup != null) {
             return new RectifyUndertakeResult(dup, order, true);
         }

@@ -40,9 +40,11 @@ public class TMgisScopeCardServiceImpl extends ServiceImpl<TMgisScopeCardMapper,
 
     @Override
     public List<TMgisScopeCard> selectTMgisScopeCardList(Wrapper<TMgisScopeCard> queryWrapper) {
-        QueryWrapper<TMgisScopeCard> wrapper = new QueryWrapper<TMgisScopeCard>();
-        com.github.pagehelper.PageHelper.startPage(1, 10);
-        wrapper.eq("status", 0);
+        // 列表与详情同一口径：按调用方的条件查，分页由调用方统一处理，
+        // 服务层不私设状态门槛、不另起分页；只补一条未删除的底线
+        QueryWrapper<TMgisScopeCard> wrapper = queryWrapper instanceof QueryWrapper
+                ? (QueryWrapper<TMgisScopeCard>) queryWrapper : new QueryWrapper<TMgisScopeCard>();
+        wrapper.eq("del_flag", 0);
         return this.baseMapper.selectList(wrapper);
     }
 
@@ -52,7 +54,7 @@ public class TMgisScopeCardServiceImpl extends ServiceImpl<TMgisScopeCardMapper,
             return 0;
         }
 
-        record.setCreateBy(record.getBillNo());
+        // 名册签名归全局自动填充，服务层不抢这笔
         TMgisUnitDoc refArch = mgisUnitDocMapper.selectOne(new QueryWrapper<TMgisUnitDoc>()
                 .eq("id", record.getSiteId()).eq("del_flag", 0));
         if (refArch == null) {
@@ -71,16 +73,17 @@ public class TMgisScopeCardServiceImpl extends ServiceImpl<TMgisScopeCardMapper,
         }
         TMgisUnitDoc bandArch = mgisUnitDocMapper.selectById(record.getSiteId());
         BigDecimal bandVal = record.getQty();
+        // 分档与判定线同一套规矩：达到上限按高一档折算（等号算高一档），
+        // 越过三档天花板仍归三档，不设四档
         int bandLevel = 0;
-        if (bandVal != null && bandArch != null) {
-            if (bandVal.compareTo(bandArch.getTh1Max()) <= 0) {
+        if (bandVal != null && bandArch != null && bandArch.getTh1Max() != null
+                && bandArch.getTh2Max() != null) {
+            if (bandVal.compareTo(bandArch.getTh1Max()) < 0) {
                 bandLevel = 1;
-            } else if (bandVal.compareTo(bandArch.getTh2Max()) <= 0) {
+            } else if (bandVal.compareTo(bandArch.getTh2Max()) < 0) {
                 bandLevel = 2;
-            } else if (bandVal.compareTo(bandArch.getTh3Max()) <= 0) {
-                bandLevel = 3;
             } else {
-                bandLevel = 4;
+                bandLevel = 3;
             }
         }
         record.setGradeLevel(bandLevel);
